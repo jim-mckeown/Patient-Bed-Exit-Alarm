@@ -1,124 +1,48 @@
-# Smart Patient Bed-Exit Alarm Node
+*For technical deployment, wiring diagrams, and source code setup, please refer to the [Technical README](./README_Patient-out-f-bed-alarm.md).*
 
-An IoT-enabled bed occupancy and exit monitoring alarm system designed for ESP32 microcontrollers. This project integrates an HX711 weight sensor interface with non-blocking load-cell data acquisition, local physical notification controls, and native integration with the **ESP32 UDP Parameter Server Framework (`ParamServer v1.1.0`)**.
+---
+# Smart Patient Bed-Exit Alarm System: Clinical Overview
 
-The node operates within a multi-supervisor environment (such as ESP32 smart clocks, mobile applications, or centralized monitoring systems), maintaining isolated status flags and delivering targeted audio/text alerts across the network without race conditions.
+## Executive Summary
+
+The **Smart Patient Bed-Exit Alarm System** is an IoT-enabled, real-time occupancy and egress monitoring solution designed to enhance patient safety in hospitals, long-term care facilities, and home-care environments. By continuously monitoring bed occupancy via discrete load-cell sensors placed under the bed frame, the system provides immediate alerts when a fall-risk patient attempts to exit the bed unassisted, allowing care staff to intervene proactively.
+
+---
+![Prototype Image](./Images/BedScale2.jpg)
+---
+
+## Key Clinical Features & Benefits
+
+* **Immediate Fall-Risk Mitigation:** Instantly detects when a patient’s weight drops below a safe occupancy threshold, triggering immediate local and network-wide alerts before a fall can occur.
+* **Multi-Station Notification Versatility:** Unlike standalone alarms that can only be heard in a single room, this system can simultaneously broadcast critical alerts to multiple supervisory nodes—including centralized nurse station dashboards, mobile caregiver apps, and hallway smart displays.
+* **Elimination of False/Delayed Alarms:** Employs high-precision, non-blocking digital weight sampling to ensure continuous monitoring integrity without system lag or freezing.
+* **High Reliability & Self-Recovery:** Features automatic network re-connection capabilities and persistent local storage. If a power outage or network drop occurs, the system automatically restores its configuration and re-establishes connectivity without requiring manual recalibration.
 
 ---
 
-## Key Features
+## Operational Workflow
 
-* **Non-Blocking Scale Engine:** Utilizes asynchronous data checks (`scale.dataWaitingAsync()` / `scale.updateAsync()`) to eliminate loop blocking and ensure network updates remain responsive.
-* **Distributed Multi-Supervisor State Tracking:** Tracks separate read/unread alarm flags for each supervisor node (IP address) on the network.
-* **Persistent Baseline Configuration:** Automatically captures, restores, and manages hardware raw tare offsets and calibration parameters via `LittleFS` storage.
-* **Over-The-Air (OTA) Updates:** Includes built-in `ArduinoOTA` support for wireless firmware deployments.
-* **Automatic Network Self-Healing:** Monitors Wi-Fi connectivity and handles background re-association without interrupting physical sampling loops.
+The system operates on two primary clinical states tailored to patient safety protocols:
 
----
+1. **Patient Occupied (In Bed):**
+* When weight meets or exceeds the configured minimum threshold (`min_weight`), the system recognizes the bed as safely occupied.
+* Optional status logs can quietly update nursing dashboards to confirm patient presence.
 
-## Hardware Requirements
 
-* **Microcontroller:** ESP32 (e.g., ESP32-WROOM-32 / ESP32-DevKitC)
-* **Load Cell ADC Module:** HX711 module paired with bed-frame or bed-post load cells
-* **Local Indicator:** 5V/3.3V Active Buzzer or Relay module (connected to `GPIO 2`)
+2. **Bed-Exit Detection (Critical Event):**
+* The moment a patient attempts to exit and weight drops below the threshold, the system triggers a **critical alert cascade**.
+* An audible local alarm activates immediately in the patient's room via an integrated buzzer or relay.
+* Simultaneously, high-priority emergency alerts are dispatched across the local network to all registered caregiver supervisors (e.g., mobile units or central monitoring stations).
 
-### Pin Configuration
 
-| Component Pin | ESP32 Pin | Function |
-| :--- | :--- | :--- |
-| **HX711 DOUT** | `GPIO 4` | Load Cell Data Output |
-| **HX711 SCK** | `GPIO 5` | Load Cell Serial Clock |
-| **Buzzer / Relay** | `GPIO 2` | Local Physical Alarm Output |
 
 ---
 
-## Software Dependencies & PlatformIO Setup
+## System Configuration & Management
 
-This project is configured for compilation using **VSCode + PlatformIO**.
+For care coordinators and facility administrators, the system supports straightforward remote or local configuration parameters to match individual patient care plans:
 
-### `platformio.ini` Configuration
-
-Ensure your `platformio.ini` includes the following dependencies:
-
-```ini
-[env:esp32dev]
-platform = espressif32
-board = esp32dev
-framework = arduino
-monitor_speed = 115200
-
-lib_deps =
-    olakal/HX711_ADC @ ^1.2.12
-    https://github.com/jim-mckeown/ESP32-UDP-Parameter-Server-Class.git
-```
-
----
-
-## System Architecture & State Machine
-
-```
-                        +----------------------------+
-                        |  HX711 Load Cell Sensors   |
-                        +--------------+-------------+
-                                       |
-                                       v
-                      +--------------------------------+
-                      |     ESP32 Bed-Scale Node       |
-                      |  - Non-blocking scale sampling |
-                      |  - State tracking per IP       |
-                      +-------+----------------+-------+
-                              |                |
-             Critical Alerts  |                |  Soft Alerts
-             ("msg dd01")     |                |  ("alert ...")
-                              v                v
-                  +--------------------------------+
-                  |    Supervisor Network Nodes    |
-                  |  - Smart Clocks                |
-                  |  - Linux / Python Servers      |
-                  |  - Mobile Applications         |
-                  +--------------------------------+
-```
-
-1. **Patient In Bed:** Weight meets or exceeds `min_weight`. Status flag updates to `1` (Occupied) and dispatches a plain-text soft notification (`alert Patient in bed`) to all registered supervisors.
-2. **Patient Bed-Exit (Critical Event):** Weight drops below `min_weight`. Dispatches a critical audio trigger (`msg dd01`) to all supervisors on port `8888`, locks all supervisor status flags to `2` (Critical), and activates the local physical alarm pin (`GPIO 2`) for the configured `alarm_duration`.
-
----
-
-## UDP Command Dictionary (Port 8888)
-
-The node listens for incoming UDP packets via `ParamServer`. 
-
-### Dynamic Parameter Control
-| Command | Example | Description |
-| :--- | :--- | :--- |
-| `<param> ?` | `cal ?` | Returns the current value of a parameter. |
-| `<param> <value>` | `min_weight 1.50` | Updates a parameter and commits to LittleFS if persistent. |
-
-#### Registered Parameters
-
-* `device_number`: Unit ID (`00`–`99`). Default is `0` (Unconfigured).
-* `cal`: HX711 Calibration factor (float).
-* `min_weight`: Minimum occupancy threshold weight in kg (float).
-* `alarm_dur`: Local alarm pin pulse duration in milliseconds (int).
-* `tare_offset`: Saved raw hardware zero-reference offset (int).
-* `current_weight`: Live filtered weight dataset (Read-Only).
-
-### Network & Polling Management
-
-| Command | Response | Description |
-| :--- | :--- | :--- |
-| `status ?` | `OK status <0|1|2>` | Returns the specific unread status flag for the requesting IP and clears it back to `0`. |
-| `status 0` | `OK status 0` | Forces explicit clearing of the status flag for the requesting IP. |
-| `add_poll <ID> <IP>` | `OK add_poll <IP>` | Registers or updates a supervisor node IP in the matrix and saves it to LittleFS. |
-| `list_poll` | `OK list_poll <IP1,IP2,...>` | Returns a CSV-formatted list of all active supervisor IPs tracked by the node. |
-
----
-
-## First-Time Configuration Sequence
-
-1. **Power On:** Upon boot, if `tare_offset` is `0`, the scale automatically zeros itself assuming an empty bed, saving the baseline raw offset to LittleFS.
-2. **Set Device Number:** Configure the unit's unique device ID over UDP:
-   ```bash
-   echo -n "device_number 1" | nc -u -w1 <ESP32_IP> 8888
-   ```
-3. **Calibrate Weight:** Place a known weight on the scale and adjust the calibration factor over UDP using `cal <value>` until `current_weight ?` reads accurately.
+* **Unit Identification (`device_number`):** Assigns a unique room or bed identifier (00–99) so staff instantly know which bed requires attention.
+* **Occupancy Threshold (`min_weight`):** Easily adjustable weight trigger (in kilograms) to accommodate different patient weights and prevent false alarms from lighter movements or bedding shifts.
+* **Alarm Duration (`alarm_dur`):** Configures how long the local physical room alarm sounds upon an exit event.
+* **Automatic Calibration (`cal` / Tare):** Automatically establishes a baseline tare offset upon power-up assuming an empty bed, ensuring accuracy over time.
