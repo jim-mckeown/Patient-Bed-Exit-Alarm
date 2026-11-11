@@ -13,10 +13,10 @@ The **Smart Patient Bed-Exit Alarm System** is an IoT-enabled, real-time occupan
 
 ## Key Clinical Features & Benefits
 
-* **Immediate Fall-Risk Mitigation:** Instantly detects when a patient’s weight drops below a safe occupancy threshold, triggering immediate local and network-wide alerts before a fall can occur.
+* **Immediate Fall-Risk Mitigation:** Instantly detects when a patient’s bed or chair weight drops below a safe occupancy threshold, triggering immediate local and network-wide alerts before a fall can occur.
 * **Multi-Station Notification Versatility:** Unlike standalone alarms that can only be heard in a single room, this system can simultaneously broadcast critical alerts to multiple supervisory nodes—including centralized nurse station dashboards, mobile caregiver apps, and hallway smart displays.
 * **Elimination of False/Delayed Alarms:** Employs high-precision, non-blocking digital weight sampling to ensure continuous monitoring integrity without system lag or freezing.
-* **High Reliability & Self-Recovery:** Features automatic network re-connection capabilities and persistent local storage. If a power outage or network drop occurs, the system automatically restores its configuration and re-establishes connectivity without requiring manual recalibration.
+* **High Reliability & Self-Recovery:** Features automatic network re-connection capabilities and persistent local storage. If a power outage or network drop occurs, the system automatically restores its configuration and re-establishes connectivity without requiring manual intervention.
 
 ---
 
